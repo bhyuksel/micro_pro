@@ -124,7 +124,36 @@ String getParam(const String &req, const String &key) {
 
 
 // ---------------- LED (PWM) ----------------
+// Gamma correction tablosu (gamma = 2.2) - renklerin doğru görünmesi için
+const uint8_t PROGMEM gammaTable[256] = {
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,
+    1,  1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,
+    2,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  4,  5,  5,  5,
+    5,  6,  6,  6,  6,  7,  7,  7,  7,  8,  8,  8,  9,  9,  9, 10,
+   10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16,
+   17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 24, 24, 25,
+   25, 26, 27, 27, 28, 29, 29, 30, 31, 32, 32, 33, 34, 35, 35, 36,
+   37, 38, 39, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 50,
+   51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68,
+   69, 70, 72, 73, 74, 75, 77, 78, 79, 81, 82, 83, 85, 86, 87, 89,
+   90, 92, 93, 95, 96, 98, 99,101,102,104,105,107,109,110,112,114,
+  115,117,119,120,122,124,126,127,129,131,133,135,137,138,140,142,
+  144,146,148,150,152,154,156,158,160,162,164,167,169,171,173,175,
+  177,180,182,184,186,189,191,193,196,198,200,203,205,208,210,213,
+  215,218,220,223,225,228,231,233,236,239,241,244,247,249,252,255
+};
+
+static inline uint8_t applyGamma(uint8_t v) {
+  return pgm_read_byte(&gammaTable[v]);
+}
+
 void writeRGB(uint8_t r, uint8_t g, uint8_t b) {
+  // gamma correction uygula (renk doğruluğu için)
+  r = applyGamma(r);
+  g = applyGamma(g);
+  b = applyGamma(b);
+  
   // parlaklık uygula
   r = applyBrightness(r);
   g = applyBrightness(g);
@@ -424,11 +453,32 @@ void sendControlPage(WiFiClient &client) {
   client.println("const ledPreview=document.getElementById('ledPreview');");
   client.println("const statusDot=document.getElementById('statusDot');");
   
+  // HEX -> RGB dönüştürücü fonksiyon
+  client.println("function hexToRgb(hex){");
+  client.println("  const r=parseInt(hex.slice(1,3),16);");
+  client.println("  const g=parseInt(hex.slice(3,5),16);");
+  client.println("  const b=parseInt(hex.slice(5,7),16);");
+  client.println("  return {r,g,b};");
+  client.println("}");
+  
+  // Debounce timer for real-time color updates
+  client.println("let colorTimeout=null;");
+  client.println("const statusText=document.getElementById('statusText');");
+  
   client.println("picker.addEventListener('input',function(){");
-  client.println("  ledPreview.style.background=this.value;");
-  client.println("  ledPreview.style.boxShadow='0 0 60px '+this.value+'80, 0 0 120px '+this.value+'40, inset 0 0 40px rgba(255,255,255,0.2)';");
-  client.println("  statusDot.style.background=this.value;");
-  client.println("  statusDot.style.boxShadow='0 0 10px '+this.value;");
+  client.println("  const c=this.value;");
+  client.println("  const rgb=hexToRgb(c);");
+  client.println("  ledPreview.style.background=c;");
+  client.println("  ledPreview.style.boxShadow='0 0 60px '+c+'80, 0 0 120px '+c+'40, inset 0 0 40px rgba(255,255,255,0.2)';");
+  client.println("  statusDot.style.background=c;");
+  client.println("  statusDot.style.boxShadow='0 0 10px '+c;");
+  client.println("  statusText.textContent='Seçiliyor...';");
+  client.println("  clearTimeout(colorTimeout);");
+  client.println("  colorTimeout=setTimeout(()=>{");
+  client.println("    fetch('/api/set?r='+rgb.r+'&g='+rgb.g+'&b='+rgb.b+'&bri='+bri.value).then(()=>{");
+  client.println("      statusText.textContent='Özel Renk';");
+  client.println("    }).catch(()=>{});");
+  client.println("  },150);");
   client.println("});");
   
   client.println("function updateBrightness(val){");
@@ -438,10 +488,12 @@ void sendControlPage(WiFiClient &client) {
   
   client.println("function applyColor(){");
   client.println("  const c=picker.value;");
+  client.println("  const rgb=hexToRgb(c);");
   client.println("  const b=bri.value;");
-  client.println("  fetch('/api/set?hex='+encodeURIComponent(c)+'&bri='+b)");
-  client.println("    .then(()=>setTimeout(()=>location.reload(),300))");
-  client.println("    .catch(()=>location.reload());");
+  client.println("  statusText.textContent='Uygulanıyor...';");
+  client.println("  fetch('/api/set?r='+rgb.r+'&g='+rgb.g+'&b='+rgb.b+'&bri='+b)");
+  client.println("    .then(()=>{ statusText.textContent='Özel Renk'; })");
+  client.println("    .catch(()=>{});");
   client.println("}");
   
   client.println("document.getElementById('colorWheel').addEventListener('click',function(){picker.click();});");
@@ -494,28 +546,44 @@ void loop() {
   String request = client.readStringUntil('\r');
   client.flush();
 
-  // --- API: custom color + brightness ---
+  // --- API: custom color + brightness (RGB olarak alıyoruz) ---
   if (request.indexOf("GET /api/set") != -1) {
-    String hex = getParam(request, "hex");  // "#RRGGBB" veya "RRGGBB"
-    String bri = getParam(request, "bri");  // 0..255
+    String rStr = getParam(request, "r");
+    String gStr = getParam(request, "g");
+    String bStr = getParam(request, "b");
+    String briStr = getParam(request, "bri");
 
-    if (bri.length() > 0) {
-      int b = bri.toInt();
-      if (b < 0) b = 0;
-      if (b > 255) b = 255;
-      brightness = b;
+    if (briStr.length() > 0) {
+      int br = briStr.toInt();
+      if (br < 0) br = 0;
+      if (br > 255) br = 255;
+      brightness = br;
     }
 
-    uint8_t r,g,b;
-    if (parseHex(hex, r,g,b)) {
-      baseR=r; baseG=g; baseB=b;
-      currentColorHex = "#" + String(hex); // görünüm için
+    if (rStr.length() > 0 && gStr.length() > 0 && bStr.length() > 0) {
+      int r = rStr.toInt();
+      int g = gStr.toInt();
+      int b = bStr.toInt();
+      
+      // Değerleri sınırla
+      r = constrain(r, 0, 255);
+      g = constrain(g, 0, 255);
+      b = constrain(b, 0, 255);
+      
+      baseR = (uint8_t)r;
+      baseG = (uint8_t)g;
+      baseB = (uint8_t)b;
+      
+      // HEX'i görüntü için oluştur
+      char hexBuf[8];
+      sprintf(hexBuf, "#%02x%02x%02x", r, g, b);
+      currentColorHex = String(hexBuf);
       currentColorName = "Özel Renk";
       animationMode = 0;
       writeRGB(baseR, baseG, baseB);
       sendPlainOK(client, "OK set");
     } else {
-      sendPlainOK(client, "ERR hex");
+      sendPlainOK(client, "ERR rgb");
     }
     client.stop();
     return;
