@@ -32,11 +32,11 @@ unsigned long previousMillis = 0;
 int currentColor = 0;
 String currentColorName = "Kapalı";
 
-// Parlaklık (0..255) - ARTIK MOBİLDEN DEĞİŞİYOR
+// Parlaklık (0..255)
 int brightness = 255;
 
 // Son seçilen baz renk (RGB)
-uint8_t baseR = 102, baseG = 102, baseB = 102; // Başlangıçta gri
+uint8_t baseR = 102, baseG = 102, baseB = 102; 
 
 // Buton durumu
 bool buttonState = HIGH;
@@ -278,7 +278,7 @@ void sendControlPage(WiFiClient &client) {
   client.println(".header h1{font-size:24px;font-weight:600;background:linear-gradient(135deg,#fff 0%,rgba(255,255,255,0.7) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}");
   client.println(".header p{font-size:13px;color:var(--text-dim)}");
   
-  // Main LED Preview - RGB format kullanıyoruz
+  // Main LED Preview
   String rgbStr = "rgb("+String(baseR)+","+String(baseG)+","+String(baseB)+")";
   String rgbaGlow1 = "rgba("+String(baseR)+","+String(baseG)+","+String(baseB)+",0.5)";
   String rgbaGlow2 = "rgba("+String(baseR)+","+String(baseG)+","+String(baseB)+",0.25)";
