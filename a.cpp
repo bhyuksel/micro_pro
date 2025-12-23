@@ -31,13 +31,12 @@ int animationMode = 0; // 0: kapalı, 1: sabit renk geçişi, 2: rainbow, 3: pul
 unsigned long previousMillis = 0;
 int currentColor = 0;
 String currentColorName = "Kapalı";
-String currentColorHex  = "#666666";
 
 // Parlaklık (0..255) - ARTIK MOBİLDEN DEĞİŞİYOR
 int brightness = 255;
 
-// Son seçilen baz renk (HEX’ten gelen)
-uint8_t baseR = 0, baseG = 0, baseB = 0;
+// Son seçilen baz renk (RGB)
+uint8_t baseR = 102, baseG = 102, baseB = 102; // Başlangıçta gri
 
 // Buton durumu
 bool buttonState = HIGH;
@@ -72,30 +71,6 @@ void hsvToRgb(float h, float s, float v, int &r, int &g, int &b) {
   r = (r_ + m) * 255;
   g = (g_ + m) * 255;
   b = (b_ + m) * 255;
-}
-
-bool parseHex(String s, uint8_t &r, uint8_t &g, uint8_t &b) {
-  s.trim();
-  s.replace("#", "");
-  if (s.length() != 6) return false;
-
-  auto nib = [](char c)->int{
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
-    if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
-    return -1;
-  };
-  auto hex2 = [&](int i)->int{
-    int a = nib(s[i]), b2 = nib(s[i+1]);
-    if (a < 0 || b2 < 0) return -1;
-    return (a << 4) | b2;
-  };
-
-  int rr = hex2(0), gg = hex2(2), bb = hex2(4);
-  if (rr < 0 || gg < 0 || bb < 0) return false;
-
-  r = (uint8_t)rr; g = (uint8_t)gg; b = (uint8_t)bb;
-  return true;
 }
 
 // query string içinden parametre çek (çok basit parser)
@@ -169,10 +144,9 @@ void writeRGB(uint8_t r, uint8_t g, uint8_t b) {
   ledcWrite(CH_B, b);
 }
 
-void setBaseColor(uint8_t r, uint8_t g, uint8_t b, const String& name, const String& hexStr) {
+void setBaseColor(uint8_t r, uint8_t g, uint8_t b, const String& name) {
   baseR = r; baseG = g; baseB = b;
   currentColorName = name;
-  currentColorHex  = hexStr;
   animationMode = 0;
   writeRGB(baseR, baseG, baseB);
 }
@@ -181,7 +155,6 @@ void turnOffLED() {
   animationMode = 0;
   baseR = baseG = baseB = 0;
   currentColorName = "Kapalı";
-  currentColorHex = "#666666";
   writeRGB(0,0,0);
 }
 
@@ -197,13 +170,13 @@ void handleAnimations() {
       if (now - previousMillis >= 1000) {
         previousMillis = now;
         switch (currentColor) {
-          case 0: setBaseColor(255,0,0,"Kırmızı","#ff4444"); break;
-          case 1: setBaseColor(0,255,0,"Yeşil","#44ff44"); break;
-          case 2: setBaseColor(0,0,255,"Mavi","#4444ff"); break;
-          case 3: setBaseColor(255,255,0,"Sarı","#ffff44"); break;
-          case 4: setBaseColor(0,255,255,"Cyan","#44ffff"); break;
-          case 5: setBaseColor(255,0,255,"Magenta","#ff44ff"); break;
-          case 6: setBaseColor(255,255,255,"Beyaz","#ffffff"); break;
+          case 0: setBaseColor(255,0,0,"Kırmızı"); break;
+          case 1: setBaseColor(0,255,0,"Yeşil"); break;
+          case 2: setBaseColor(0,0,255,"Mavi"); break;
+          case 3: setBaseColor(255,255,0,"Sarı"); break;
+          case 4: setBaseColor(0,255,255,"Cyan"); break;
+          case 5: setBaseColor(255,0,255,"Magenta"); break;
+          case 6: setBaseColor(255,255,255,"Beyaz"); break;
         }
         currentColor = (currentColor + 1) % 7;
         animationMode = 1; // setBaseColor mode=0 yapıyor; geri alalım
@@ -218,7 +191,6 @@ void handleAnimations() {
         writeRGB((uint8_t)r, (uint8_t)g, (uint8_t)b);
         hue += 4; if (hue >= 360) hue = 0;
         currentColorName = "Rainbow";
-        currentColorHex = "#ff00ff";
       }
       break;
 
@@ -247,7 +219,6 @@ void handleAnimations() {
         if (toggle) writeRGB(255,0,0);
         else        writeRGB(0,0,255);
         currentColorName = "Alarm";
-        currentColorHex = "#ff0000";
       }
       break;
   }
@@ -264,9 +235,9 @@ void handleButton() {
       unsigned long pressDuration = millis() - buttonPressTime;
       if (pressDuration < 500) { // kısa basış: renk değiştir (RGB)
         currentColor = (currentColor + 1) % 3;
-        if (currentColor == 0) setBaseColor(255,0,0,"Kırmızı","#ff4444");
-        if (currentColor == 1) setBaseColor(0,255,0,"Yeşil","#44ff44");
-        if (currentColor == 2) setBaseColor(0,0,255,"Mavi","#4444ff");
+        if (currentColor == 0) setBaseColor(255,0,0,"Kırmızı");
+        if (currentColor == 1) setBaseColor(0,255,0,"Yeşil");
+        if (currentColor == 2) setBaseColor(0,0,255,"Mavi");
       } else { // uzun basış: animasyon
         animationMode = (animationMode + 1) % 5;
         if (animationMode == 1) animationMode = 2; // 1'i geç
@@ -307,11 +278,14 @@ void sendControlPage(WiFiClient &client) {
   client.println(".header h1{font-size:24px;font-weight:600;background:linear-gradient(135deg,#fff 0%,rgba(255,255,255,0.7) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}");
   client.println(".header p{font-size:13px;color:var(--text-dim)}");
   
-  // Main LED Preview
-  client.println(".led-preview{position:relative;width:140px;height:140px;margin:0 auto 30px;border-radius:50%;background:"+currentColorHex+";box-shadow:0 0 60px "+currentColorHex+"80,0 0 120px "+currentColorHex+"40,inset 0 0 40px rgba(255,255,255,0.2);transition:all 0.5s ease}");
+  // Main LED Preview - RGB format kullanıyoruz
+  String rgbStr = "rgb("+String(baseR)+","+String(baseG)+","+String(baseB)+")";
+  String rgbaGlow1 = "rgba("+String(baseR)+","+String(baseG)+","+String(baseB)+",0.5)";
+  String rgbaGlow2 = "rgba("+String(baseR)+","+String(baseG)+","+String(baseB)+",0.25)";
+  client.println(".led-preview{position:relative;width:140px;height:140px;margin:0 auto 30px;border-radius:50%;background:"+rgbStr+";box-shadow:0 0 60px "+rgbaGlow1+",0 0 120px "+rgbaGlow2+",inset 0 0 40px rgba(255,255,255,0.2);transition:all 0.5s ease}");
   client.println(".led-preview::before{content:'';position:absolute;top:10%;left:15%;width:35%;height:20%;background:linear-gradient(180deg,rgba(255,255,255,0.6) 0%,transparent 100%);border-radius:50%;filter:blur(8px)}");
   client.println(".status-badge{display:inline-flex;align-items:center;gap:8px;background:var(--glass);backdrop-filter:blur(10px);border:1px solid var(--border);padding:10px 20px;border-radius:30px;font-size:14px;font-weight:500;margin-bottom:24px}");
-  client.println(".status-dot{width:8px;height:8px;border-radius:50%;background:"+currentColorHex+";box-shadow:0 0 10px "+currentColorHex+"}");
+  client.println(".status-dot{width:8px;height:8px;border-radius:50%;background:"+rgbStr+";box-shadow:0 0 10px "+rgbStr+"}");
   
   // Glass Card
   client.println(".card{background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:24px;padding:24px;margin-bottom:16px}");
@@ -392,7 +366,12 @@ void sendControlPage(WiFiClient &client) {
   client.println("<div class='color-section'>");
   client.println("<div class='color-wheel-wrap'>");
   client.println("<div class='color-wheel' id='colorWheel'></div>");
-  client.println("<input type='color' class='color-picker-native' id='picker' value='"+currentColorHex+"'>");
+  // Color picker için HEX gerekli (HTML5 standardı), JS ile RGB'den oluşturuyoruz
+  String hexForPicker = "#";
+  char hexBuf[7];
+  sprintf(hexBuf, "%02x%02x%02x", baseR, baseG, baseB);
+  hexForPicker += hexBuf;
+  client.println("<input type='color' class='color-picker-native' id='picker' value='"+hexForPicker+"'>");
   client.println("</div>");
   client.println("<button class='apply-btn' onclick='applyColor()'>🎨 Rengi Uygula</button>");
   client.println("</div></div>");
@@ -574,10 +553,6 @@ void loop() {
       baseG = (uint8_t)g;
       baseB = (uint8_t)b;
       
-      // HEX'i görüntü için oluştur
-      char hexBuf[8];
-      sprintf(hexBuf, "#%02x%02x%02x", r, g, b);
-      currentColorHex = String(hexBuf);
       currentColorName = "Özel Renk";
       animationMode = 0;
       writeRGB(baseR, baseG, baseB);
@@ -605,19 +580,34 @@ void loop() {
   }
 
   // --- Animasyonlar ---
-  if (request.indexOf("GET /animation/rainbow") != -1) { animationMode = 2; currentColorName="Rainbow"; currentColorHex="#ff00ff"; }
-  else if (request.indexOf("GET /animation/pulse") != -1)  { animationMode = 3; currentColorName="Pulse";  /* pulse base color kullanır */ }
-  else if (request.indexOf("GET /animation/alarm") != -1)  { animationMode = 4; currentColorName="Alarm";  currentColorHex="#ff0000"; }
-  else if (request.indexOf("GET /animation/0") != -1)      { animationMode = 0; writeRGB(baseR, baseG, baseB); }
+  if (request.indexOf("GET /animation/rainbow") != -1) { 
+    animationMode = 2; 
+    currentColorName = "Rainbow"; 
+    baseR = 255; baseG = 0; baseB = 255; // Magenta göster
+  }
+  else if (request.indexOf("GET /animation/pulse") != -1) { 
+    animationMode = 3; 
+    currentColorName = "Pulse"; 
+    // pulse base color kullanır
+  }
+  else if (request.indexOf("GET /animation/alarm") != -1) { 
+    animationMode = 4; 
+    currentColorName = "Alarm"; 
+    baseR = 255; baseG = 0; baseB = 0; // Kırmızı göster
+  }
+  else if (request.indexOf("GET /animation/0") != -1) { 
+    animationMode = 0; 
+    writeRGB(baseR, baseG, baseB); 
+  }
 
   // --- Sabit renkler ---
-  else if (request.indexOf("GET /red") != -1)     { setBaseColor(255,0,0,"Kırmızı","#ff4444"); }
-  else if (request.indexOf("GET /green") != -1)   { setBaseColor(0,255,0,"Yeşil","#44ff44"); }
-  else if (request.indexOf("GET /blue") != -1)    { setBaseColor(0,0,255,"Mavi","#4444ff"); }
-  else if (request.indexOf("GET /yellow") != -1)  { setBaseColor(255,255,0,"Sarı","#ffff44"); }
-  else if (request.indexOf("GET /cyan") != -1)    { setBaseColor(0,255,255,"Cyan","#44ffff"); }
-  else if (request.indexOf("GET /magenta") != -1) { setBaseColor(255,0,255,"Magenta","#ff44ff"); }
-  else if (request.indexOf("GET /white") != -1)   { setBaseColor(255,255,255,"Beyaz","#ffffff"); }
+  else if (request.indexOf("GET /red") != -1)     { setBaseColor(255,0,0,"Kırmızı"); }
+  else if (request.indexOf("GET /green") != -1)   { setBaseColor(0,255,0,"Yeşil"); }
+  else if (request.indexOf("GET /blue") != -1)    { setBaseColor(0,0,255,"Mavi"); }
+  else if (request.indexOf("GET /yellow") != -1)  { setBaseColor(255,255,0,"Sarı"); }
+  else if (request.indexOf("GET /cyan") != -1)    { setBaseColor(0,255,255,"Cyan"); }
+  else if (request.indexOf("GET /magenta") != -1) { setBaseColor(255,0,255,"Magenta"); }
+  else if (request.indexOf("GET /white") != -1)   { setBaseColor(255,255,255,"Beyaz"); }
   else if (request.indexOf("GET /off") != -1)     { turnOffLED(); }
 
   // Sayfayı gönder

@@ -1,4 +1,4 @@
-# 🎨 RGB LED Kontrol Sistemi - Detaylı Kod Açıklaması
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv# 🎨 RGB LED Kontrol Sistemi - Detaylı Kod Açıklaması
 
 Bu dokümantasyon, ESP32 tabanlı RGB LED kontrol sisteminin tüm bileşenlerini detaylıca açıklamaktadır.
 
